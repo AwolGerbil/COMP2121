@@ -14,21 +14,19 @@
 inputstore: .byte 16
 bitpattern: .bit 4
 
-
 .cseg
 
 .def temp=r16
 .def counter=r17
 .def counter2=r18
 .def counter3=r19
-.def counter4=r20
-.def counter5=r21
+.def flashcounter=r20
 .def numbit=r22
 .def ledval=r23
 .def storecount=r24
 .def readcount=r25
-.def xlow = r26
-.def xhigh = r27
+.def xlow=r26
+.def xhigh=r27
 ;setting up the interrupt vector
 jmp RESET
 jmp EXT_INT0 ; IRQ0 Handler for PD0
@@ -48,154 +46,152 @@ jmp Default ; Timer1 Overflow Handler
 jmp Default ; Timer0 Compare Handler
 jmp Timer0  ; Timer0 Overflow Handler
 
-
 Default: reti
 
 RESET: 
-	ldi temp, high(RAMEND) ; Initialize stack pointer
+	ldi temp, high(RAMEND)		; Initialize stack pointer
 	out SPH, temp
 	ldi temp, low(RAMEND)
 	out SPL, temp
 	;set up X pointer
-	ldi r26, low(inputstore)
-	ldi r27, high(inputstore)
-	ldi counter,0            
-	ldi counter2,0
-	ldi counter3,0
-	ldi counter4,0
-	ldi counter5,0
+	ldi xlow, low(inputstore)
+	ldi xhigh, high(inputstore)
+	ldi counter, 0
+	ldi counter2, 0
+	ldi counter3, 0
+	ldi flashcounter, 0
 	ldi storecount, 0
 	ldi readcount, 0
 	ldi temp, 0
-	out DDRD, temp ;set port D as input
-	ldi temp,255
-	out DDRB,temp   ;set port B as output
+	out DDRD, temp			; Set port D as input
+	ldi temp, 255
+	out DDRB, temp			; Set port B as output
 	ldi ledval,0
-	out PORTB,ledval
+	out PORTB, ledval
 	rjmp main
 
-; interrupt place invoked by EXT interrupt0 when button PB0 is pressed
-EXT_INT0:                  ; saving the temp value into the stack  
+; External Interrupt0 Service Routine : PB0
+EXT_INT0:
+	push temp			; Push Conflict Registers
+	in temp, SREG			; Saving SREG
 	push temp
-	in temp, SREG              ; inserting the SREG values into temp
-	push temp                  ; saving the temp into stack
-	
-	ldi temp, 0xff					;debouncing
+	push xlow
+	push xhigh
+
+	ldi temp, 0xff			; Debouncing, much lazy
 	delay0:
 	dec temp
-	brne delay0	
-	
-	push r26 ;push x pointer
-	push r27
-	ldi temp, 0;
-	;store 0 in memory
-	ldi r26, low(inputstore) ;set up x pointer
-	ldi r27, high(inputstore)
-	add r26, storecount ;increment x to account for stored numbers
-	adc r27, 0
-	ldi temp, 0x00 ;load 0 for storing
-	st x, temp ;store value
-	inc storecount ;increase number of stored values
-	pop r27
-	pop r26
-	pop temp                   ; taking out temp from stack which has SREG
-	out SREG, temp             ; copy the values in temp into SREG
-	pop temp                   ; take the temp value from stack
+	brne delay0
+
+	; Store 0 in memory
+
+	ldi xlow, low(inputstore)	; Set up x pointer
+	ldi xhigh, high(inputstore)
+	add xlow, storecount		; Increment x to account for stored numbers
+	adc xhigh, 0
+	ldi temp, 0x00			; Load 0 for storing
+	st x, temp			; Store 0
+	inc storecount			; Increment stored values
+
+	pop xhigh			; Pop Conflict Registers
+	pop xlow
+	pop temp			; Restoring SREG
+	out SREG, temp
+	pop temp
 	reti
 
-
-
-; interrupt place invoked by EXT interrupt1 when button PB1 is pressed
+; External Interrupt1 Service Routine : PB1
 EXT_INT1:
+	push temp			; Push Conflict Registers
+	in temp, SREG			; Saving SREG
 	push temp
-	in temp, SREG
-	push temp
-	push r26 						;push x pointer
-	push r27
+	push xlow
+	push xhigh
 
-	ldi temp, 0xff					;debouncing
+	ldi temp, 0xff			; Debouncing, much lazy
 	delay1:
 	dec temp
 	brne delay1
-	
-									;store 1 in memory
-	ldi r26, low(inputstore) ;set up x pointer
-	ldi r27, high(inputstore)
-	add r26, storecount ;increment x to account for stored numbers
-	adc r27, 0
-	ldi temp, 0xFF ;load FF for storing
-	st x, temp ;store value
-	inc storecount ;increase number of stored values
-	pop r27
-	pop r26
-	pop temp
+
+	; Store 1 in memory
+
+	ldi xlow, low(inputstore)	; Set up x pointer
+	ldi xhigh, high(inputstore)
+	add xlow, storecount 		; Increment x to account for stored numbers
+	adc xhigh, 0
+	ldi temp, 0xFF			; Load FF for storing
+	st x, temp			; Store FF
+	inc storecount			; Increment stored values
+
+	pop xhigh			; Pop Conflict Registers
+	pop xlow
+	pop temp			; Restoring SREG
 	out SREG, temp
 	pop temp
-reti
+	reti
 
-
-Timer0:                  	; Prologue starts.
-	push r29                 ; Save all conflict registers in the prologue.
-	push r28
-	in r24, SREG
-	push r24                 ; Prologue ends.
+Timer0:
+	push temp			; Push Conflict Registers
+	in temp, SREG			; Saving SREG
+	push temp
+	push xlow
+	push xhigh
 
 /**** a counter for 3597 is needed to get one second-- Three counters are used in this example **************/                                          
                          ; 3597  (1 interrupt 278microseconds therefore 3597 interrupts needed for 1 sec)
                          ; 33 * 109 = 3597
         inc counter
-	cpi counter, 33          ; counting for 33
+	cpi counter, 33			; Counting for 33
 	brne exit
-	
 	ldi counter, 0
+
 	inc counter2
-	cpi counter2, 109        ; counting for 109
+	cpi counter2, 109		; Counting for 109
 	brne exit
+	ldi counter2, 0
 
-	cpi ledval,0             ; compare the current ledval for zero
+	cpi ledval, 0			; Compare the current ledval for zero
 	breq ledoffstate
-	inc counter4
-	cpi counter4,2			;checks if the led has been on for 2 seconds
-	brne outled   			;if it hasnt, skip to output
-	clr counter4             ; if it is zero jump to set it to FF
-	ldi ledval,0             ; if the current ledval is not zero set it to 0
+	cpi counter3, 2			; Checks if the led has been on for 2 seconds
+	brne outled			; If it hasnt, skip to output
+	clr counter3			; If it is zero jump to set it to FF
+	ldi ledval, 0             	; If the current ledval is not zero set it to 0
 
-	rjmp outled              ; jump to out put value
+	rjmp outled			; Jump to out put value
 
 ledoffstate:
-	inc counter5
-	cpi counter5,3			;check if flashed 3 times
+	inc flashcounter
+	cpi flashcounter, 3		; Check if flashed 3 times
 	breq end3cycle
-		
-		
-setVal: ldi r26, low(bitpattern) ;set up x pointer
-	ldi r27, high(bitpattern)
-	ld ledval,X    ; set the ledval 
 
-outled: ldi counter,0    ; clearing the counter values after counting 3597 interrupts which gives us one second
-        ldi counter2,0
-        ldi counter3,0
+	ldi xlow, low(bitpattern)	; Set up x pointer
+	ldi xhigh, high(bitpattern)
+	ld ledval, X			; Set the ledval 
 
-        out PORTB,ledval ; sending the ledval to port
-        rjmp exit        ; go to exit
-		
+outled:
+	ldi counter, 0			; Clearing the counter values after counting 3597 interrupts which gives us one second
+        ldi counter2, 0
+
+        out PORTB, ledval 		; Sending the ledval to portb
+        rjmp exit
+
 end3cycle:
-			;check if there is enough data for a new bit pattern
-	ldi ledval,0	
-	rjmp  outled
+	ldi ledval, 0			; Check if there is enough data for a new bit pattern
+	rjmp outled
 		
-exit: 
-	pop r24                  ; Epilogue starts;
-	out SREG, r24            ; Restore all conflict registers from the stack.
-	pop r28
-	pop r29
-	reti                     ; Return from the interrupt.
+exit:
+	pop xhigh			; Pop Conflict Registers
+	pop xlow
+	pop temp			; Restoring SREG
+	in SREG, temp
+	pop temp
+	reti
 
 main:
-	ldi temp, 0b00000010     ; 
-	out TCCR0, temp          ; Prescaling value=8  ;256*8/7.3728( Frequency of the clock 7.3728MHz, for the overflow it should go for 256 times)
-	ldi temp, 1<<TOIE0       ; =278 microseconds
-	out TIMSK, temp          ; T/C0 interrupt enable
-	sei                      ; Enable global interrupt
+	ldi temp, 0b00000010
+	out TCCR0, temp			; Prescaling value=8  ;256*8/7.3728( Frequency of the clock 7.3728MHz, for the overflow it should go for 256 times)
+	ldi temp, 1<<TOIE0		; =278 microseconds
+	out TIMSK, temp			; T/C0 interrupt enable
+	sei				; Enable global interrupt
 loop: 
-	rjmp loop          ; loop forever
+	rjmp loop			; Loop forever
