@@ -142,12 +142,15 @@ Timer0:                  	; Prologue starts.
 
 /**** a counter for 3597 is needed to get one second-- Three counters are used in this example **************/                                          
                          ; 3597  (1 interrupt 278microseconds therefore 3597 interrupts needed for 1 sec)
-	cpi counter, 97          ; counting for 97
-	brne notsecond
-	 
-	cpi counter2, 35         ; counting for 35
-	brne secondloop          ; jumping into count 100 
-
+                         ; 33 * 109 = 3597
+        inc counter
+	cpi counter, 33          ; counting for 33
+	brne exit
+	
+	ldi counter, 0
+	inc counter2
+	cpi counter2, 109        ; counting for 109
+	brne exit
 
 	cpi ledval,0             ; compare the current ledval for zero
 	breq ledoffstate
@@ -175,16 +178,6 @@ outled: ldi counter,0    ; clearing the counter values after counting 3597 inter
 
         out PORTB,ledval ; sending the ledval to port
         rjmp exit        ; go to exit
-
-notsecond: inc counter   ; if it is not a second, increment the counter
-        rjmp exit
-
-secondloop: inc counter3 ; counting 100 for every 35 times := 35*100 := 3500
-        cpi counter3,100 
-        brne exit
-	inc counter2
-	ldi counter3,0
-	rjmp exit
 		
 end3cycle:
 			;check if there is enough data for a new bit pattern
